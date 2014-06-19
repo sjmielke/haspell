@@ -1,4 +1,11 @@
-module TrieMED where
+-- | Supplies a method for calculating the
+-- minimum edit distance (MED) from a word
+-- to all words of a @WTrie@.
+
+module TrieMED (
+    Result,
+    calcMEDs,
+    ) where
 
 import Data.List (sort, sortBy, nub)
 import Data.Ord (comparing)
@@ -6,7 +13,8 @@ import Data.Maybe (maybeToList)
 
 import WTrie
 
--- | A MED
+-- | A MEDTable stores the user user input String
+-- and the current column of the MED matrix.
 type MEDTable = [(Char, Int)]
 type Result = (String, Int)
 
@@ -14,18 +22,19 @@ type Result = (String, Int)
 -- the current word the MED is calculated for (careful though, the word is reversed!).
 type MEDTableState = (MEDTable, String)
 
+-- | Traverses the given @WTrie@ succesively building the MED matrices for
+-- each word to the given input word, returning a list of the 10 best matches.
 calcMEDs :: String -> WTrie -> [Result]
 calcMEDs uword ts = tenBest
 --                  $ (\l -> [(uword ++ " compared against #nodes", length l)])
                   $ map (\(s,i) -> (reverse s, i))
                   $ reduceTriesAll (initialState uword) ts
 --                  $ reduceTriesKeepTrack (initialState uword, []) ts
-
-tenBest :: Ord o => [(a, o)] -> [(a, o)]
-tenBest = take 10 . sortBy (comparing snd)
-
-initialState :: String -> MEDTableState
-initialState s = (zip (' ':s) [0..], "")
+    where
+        tenBest :: Ord o => [(a, o)] -> [(a, o)]
+        tenBest = take 10 . sortBy (comparing snd)
+        initialState :: String -> MEDTableState
+        initialState s = (zip (' ':s) [0..], "")
 
 reduceTriesAll :: MEDTableState -> WTrie -> [Result]
 reduceTriesAll (oldState) ts = concatMap reduceIndiv $ ts

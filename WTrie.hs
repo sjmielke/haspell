@@ -1,3 +1,5 @@
+-- | A simple trie implementation for word lists.
+
 module WTrie (
     -- * Data type
     WIndivTrie(..),
@@ -52,7 +54,6 @@ addToTrie (x:xs) ((t@(WNode l f cs)):ts) = if x == l
                                            then t{children = addToTrie xs cs} : ts
                                            else t                             : addToTrie (x:xs) ts
 
-
 -- | Loads a whitespace-separated word list and creates a @WTrie@ out of all words.
 fromFile :: String -> IO WTrie
 fromFile f = do rawwords <- readFile f
@@ -71,7 +72,7 @@ toList = concatMap singleToList
 contains :: WTrie -> String -> Bool
 contains _ "" = True
 contains [] _ = False
-contains ((t@(WNode l f cs)):ts) s@(x:[]) = if l == x && f then True else False
-contains ((t@(WNode l f cs)):ts) s@(x:xs) = if l == x
-                                            then contains cs xs
-                                            else contains ts s
+contains ((t@(WNode l f cs)):ts) s@(x:xs) | l == x    = if null xs
+                                                        then f
+                                                        else contains cs xs
+                                          | otherwise = contains ts s

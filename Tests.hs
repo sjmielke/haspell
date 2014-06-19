@@ -7,6 +7,7 @@ import System.Environment (getArgs)
 
 import WTrie
 import TrieMED
+import Haspell
 
 testWL :: [String] -> IO ()
 testWL wl_dup = let wl = nub' S.empty wl_dup
@@ -34,8 +35,8 @@ testExample = do let res = calcMEDs "Lit" $ fromList ["Lot", "Lose", "Hose", "Lo
 
 main = do ts <- fromFile "/home/sjm/downloads/aspell-dump-expand-de_DE.utf8.txt"
           let wordnum = length $ toList ts -- Cheap deepseq. Also nice to know.
-          putStrLn $ show wordnum ++ " words loaded."
-          let simpleTest w = show $ calcMEDs w ts
+          putStrLn $ (invertText $ show wordnum) ++ faintText " words loaded."
+          let simpleTest w = show $ if ts `contains` w then [] else calcMEDs w ts
           let printSimpletest = putStrLn . simpleTest
           --mapM printSimpletest ["sfalihfaiwuehfliwauehfaiwfa", "ajfalwfaheofifmafowjfaiofja", "iwaefiehfalierjgmvcsafsefrf", "aioewjfoasmcoreijfsoerigmer", "asoiejfadorjgaormfairjfoeig", "wefaiwhefiascaimifaloifricm", "oeiafjigrofimaeorijfseorjgj", "aoiejfmosimfcijfloirajfsirg", "maoirjfoaaergaeergjfsfsafsm", "fliwaufsaedfsdfsadfehfaiwfa", "fmaforegwefawefwaefjfaiofja", "rjgmvwefasdasdfasfcsafsefrf", "reijfdefasfaefawefsoerigmer", "aormfaefrthfaefaefairjfoeig", "aimifaefaweffsawefaloifricm", "aeorijawrsthaewfgerfseorjgj", "ijfloirathsrhrsthrztqjfsirg", "maoirjfoaersfawgaageraergjm"]
           --mapM printSimpletest ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
