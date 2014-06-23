@@ -1,6 +1,6 @@
 -- | Supplies a method for calculating the
 -- minimum edit distance (MED) from a word
--- to all words of a @WTrie@.
+-- to all words of a 'WTrie'.
 
 module TrieMED (
     Result,
@@ -22,13 +22,14 @@ type Result = (String, Int)
 -- the current word the MED is calculated for (careful though, the word is reversed!).
 type MEDTableState = (MEDTable, String)
 
--- | Traverses the given @WTrie@ succesively building the MED matrices for
+-- | Traverses the given 'WTrie' succesively building the MED matrices for
 -- each word to the given input word, returning a list of the 10 best matches.
 calcMEDs :: String -> WTrie -> [Result]
-calcMEDs uword ts = tenBest
+calcMEDs uword ts = map (\(s,i) -> (reverse s, i))
+                  $ tenBest
 --                  $ (\l -> [(uword ++ " compared against #nodes", length l)])
-                  $ map (\(s,i) -> (reverse s, i))
-                  $ reduceTriesAll (initialState uword) ts
+--                  $ reduceTriesAll (initialState uword) ts
+                  $ reduceTriesBetterThan 8 (initialState uword) ts
 --                  $ reduceTriesKeepTrack (initialState uword, []) ts
     where
         tenBest :: Ord o => [(a, o)] -> [(a, o)]
@@ -37,12 +38,27 @@ calcMEDs uword ts = tenBest
         initialState s = (zip (' ':s) [0..], "")
 
 reduceTriesAll :: MEDTableState -> WTrie -> [Result]
-reduceTriesAll (oldState) ts = concatMap reduceIndiv $ ts
+reduceTriesAll oldState ts = concatMap reduceIndiv ts
     where
         reduceIndiv :: WIndivTrie -> [Result]
         reduceIndiv (WNode l f cs) = let (newState@(currentTable, currentWord), res, currentMED) = calcNode oldState l f
-                                     in case res of Nothing ->     reduceTriesAll (newState) cs
-                                                    Just r  -> r : reduceTriesAll (newState) cs
+                                     in case res of Nothing ->     reduceTriesAll newState cs
+                                                    Just r  -> r : reduceTriesAll newState cs
+
+reduceTriesBetterThan :: Int -> MEDTableState -> WTrie -> [Result]
+reduceTriesBetterThan b ini ts = filter ((< b) . snd) $ reduceList ini ts
+    where
+        reduceList :: MEDTableState -> WTrie -> [Result]
+        reduceList oldState = concatMap (reduceIndiv oldState)
+        reduceIndiv :: MEDTableState -> WIndivTrie -> [Result]
+        reduceIndiv oldState (WNode l f cs) = let (newState@(currentTable, currentWord), res, currentMED) = calcNode oldState l f
+                                                  -- The best MED that is still possible in future steps is MED - max(0, wordLengthDifference)
+                                                  bestMEDStillPossible = currentMED - max 0 ((length currentTable - 1) - (length currentWord))
+                                                  followers = if bestMEDStillPossible < b
+                                                              then reduceTriesBetterThan b newState cs
+                                                              else []
+                                              in case res of Nothing ->     followers
+                                                             Just r  -> r : followers
 
 reduceTriesKeepTrack :: (MEDTableState, [Result]) -> WTrie -> [Result]
 reduceTriesKeepTrack _ [] = []
