@@ -23,17 +23,20 @@ type Result = (String, Int)
 type MEDTableState = (MEDTable, String)
 
 -- | Traverses the given 'WTrie' succesively building the MED matrices for
--- each word to the given input word, returning a list of the 10 best matches.
-calcMEDs :: String -> WTrie -> [Result]
-calcMEDs uword ts = map (\(s,i) -> (reverse s, i))
-                  $ tenBest
---                  $ (\l -> [(uword ++ " compared against #nodes", length l)])
---                  $ reduceTriesAll (initialState uword) ts
-                  $ reduceTriesBetterThan 8 (initialState uword) ts
---                  $ reduceTriesKeepTrack (initialState uword, []) ts
+-- each word to the given input word, returning a list of the best matches.
+calcMEDs :: Int -- ^ the number of suggestions to return
+         -> String
+         -> WTrie
+         -> [Result]
+calcMEDs numberOfSuggestions uword ts = map (\(s,i) -> (reverse s, i))
+                                      $ take numberOfSuggestions . sortBy (comparing snd)
+--                                      $ (\l -> [(uword ++ " compared against #nodes", length l)])
+--                                      $ reduceTriesAll (initialState uword) ts
+                                      -- Usually we want 10 results better than 8, if more are requested,
+                                      -- the betterThan-value will grow to encompass all results.
+                                      $ reduceTriesBetterThan (numberOfSuggestions - 2) (initialState uword) ts
+--                                      $ reduceTriesKeepTrack (initialState uword, []) ts
     where
-        tenBest :: Ord o => [(a, o)] -> [(a, o)]
-        tenBest = take 10 . sortBy (comparing snd)
         initialState :: String -> MEDTableState
         initialState s = (zip (' ':s) [0..], "")
 
