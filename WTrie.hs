@@ -44,16 +44,19 @@ prettyprint ts = concat . intersperse "\n" $ map (ppIndivWalk 1) ts
 
 -- | Creates a (simply linear) 'WTrie' from one word.
 singleton :: String -> WTrie
+singleton [] = []
 singleton (c:[]) = [WNode c True  []            ]
 singleton (c:cs) = [WNode c False (singleton cs)]
 
 -- | Adds a word to an existing 'WTrie'.
 addToTrie :: String -> WTrie -> WTrie
 addToTrie s [] = singleton s
-addToTrie (x:[]) ((t@(WNode l f cs)):ts) = if x == l
+addToTrie (x:[]) ((t@(WNode l f cs)):ts) = seq ts $
+                                           if x == l
                                            then t{final = True} : ts
                                            else t               : addToTrie (x:[]) ts
-addToTrie (x:xs) ((t@(WNode l f cs)):ts) = if x == l
+addToTrie (x:xs) ((t@(WNode l f cs)):ts) = seq ts $
+                                           if x == l
                                            then t{children = addToTrie xs cs} : ts
                                            else t                             : addToTrie (x:xs) ts
 

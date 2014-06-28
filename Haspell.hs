@@ -5,27 +5,27 @@ import Data.Char (isLetter)
 import Data.List.Split (split, whenElt, dropBlanks, keepDelimsR, onSublist)
 import Text.Read (readMaybe)
 import System.Exit (exitSuccess)
-import System.Console.ArgParser (ParserSpec, Descr(..), parsedBy, andBy, reqPos, boolFlag, setAppEpilog, setAppDescr, mkDefaultApp, runApp)
+import System.Console.ArgParser (ParserSpec, Descr(..), parsedBy, andBy, reqPos, boolFlag, setAppEpilog, setAppDescr, mkDefaultApp, runApp, getAppVersion)
 
 import WTrie
 import TrieMED
 
--- | Wrap text with given ANSI code and reset code to change display properties.
+-- | Wrap text with given ANSI code and reset code to change display properties, unless the comatibility option is set.
 -- (see @http://en.wikipedia.org/wiki/ANSI_escape_code@ )
-ansiWrap :: Int -> String -> String
-ansiWrap i = (("\ESC[" ++ (show i) ++ "m")++) . (++"\ESC[0m")
+ansiWrap :: Bool -> Int -> String -> String
+ansiWrap compat i = if compat then id else (("\ESC[" ++ (show i) ++ "m")++) . (++"\ESC[0m")
 
--- | Insert ANSI codes to display the argument with inverted colors.
-invertText :: String -> String
-invertText = ansiWrap 7
+-- | Insert ANSI codes to display the argument with inverted colors, unless the comatibility option is set.
+invertText :: Bool -> String -> String
+invertText compat = ansiWrap compat 7
 
--- | Insert ANSI codes to display the argument underlined.
-underlineText :: String -> String
-underlineText = ansiWrap 4
+-- | Insert ANSI codes to display the argument underlined, unless the comatibility option is set.
+underlineText :: Bool -> String -> String
+underlineText compat = ansiWrap compat 4
 
--- | Insert ANSI codes to display the argument in fainter font.
-faintText :: String -> String
-faintText = ansiWrap 2
+-- | Insert ANSI codes to display the argument in fainter font, unless the comatibility option is set.
+faintText :: Bool -> String -> String
+faintText compat = ansiWrap compat 2
 
 data SentencePart = Word String | Punctuation String deriving (Show)
 type Sentence = [SentencePart]
@@ -46,8 +46,10 @@ segmentText = map segmentSentence . splitOnSubSeqs [". ", "! ", "? "] . (:[])
                                      $ map (split (keepDelimsR $ dropBlanks $ onSublist sq))
                                      $ splitOnSubSeqs sqs text
         segmentSentence :: String -> Sentence
-        segmentSentence = map (\s@(x:xs) -> if isLetter x then Word s else Punctuation s)
-                        . split (dropBlanks $ whenElt (not . isLetter))
+        segmentSentence = map (\s@(x:xs) -> if isLetterish x then Word s else Punctuation s)
+                        . split (dropBlanks $ whenElt (not . isLetterish))
+        isLetterish :: Char -> Bool
+        isLetterish c = (c == '\'') || (isLetter c)
 
 -- | Interactively correct a segmented sentence using a given 'WTrie'
 -- (optionally using a more compatible rendering mode).
@@ -62,7 +64,7 @@ correctSentence ts compat s = mapM (correctSentencePart 10) sWithIds
                then return $ Word w
                else do
                     let results = calcMEDs numberOfSuggestions w ts
-                        errorCase = do putStrLn $ invertText "What the fuck is wrong with you? Try again."
+                        errorCase = do putStrLn $ invertText compat "What the fuck is wrong with you? Try again."
                                        correctSentencePart numberOfSuggestions (i, Word w)
                     putStrLn $ highlightInSentence i sWithIds
                     putStrLn $ renderAsTable results
@@ -72,24 +74,26 @@ correctSentence ts compat s = mapM (correctSentencePart 10) sWithIds
                                        "i" -> return $ Word w
                                        "m" -> correctSentencePart (numberOfSuggestions + 10) (i, Word w)
                                        "x" -> exitSuccess
+                                       _   -> errorCase
                         Just ch -> do if ch >= 0 && ch < length results
                                       then return $ Word (fst $ results !! ch)
                                       else errorCase
         highlightInSentence :: Int -> [(Int, SentencePart)] -> String
-        highlightInSentence i = ('\n':) . concatMap (\(i', p) -> case p of Punctuation w' -> faintText w'
-                                                                           Word w'        -> if i /= i'
-                                                                                             then faintText w'
-                                                                                             else if compat
-                                                                                                  then invertText w'
-                                                                                                  else w')
+        highlightInSentence i = ('\n':) . concatMap (\(i', p) ->
+                                            case p of Punctuation w' -> faintText compat w'
+                                                      Word w'        -> if i /= i'
+                                                                        then faintText compat w'
+                                                                        else if compat
+                                                                             then "   > " ++ w' ++ " <   "
+                                                                             else w')
                                         . take 21 -- Truncate long sentences
                                         . drop (i - 10)
         renderAsTable :: [Result] -> String
         renderAsTable = ("\n" ++)
-                      . (++ faintText "i ignore\nm more suggestions\nx exit/abort")
-                      . concatMap (\(i, (s, c)) -> faintText (show i ++ ". ")
-                                                ++ (if compat then underlineText s else s)
-                                                ++ faintText (" (" ++ show c ++ ")\n"))
+                      . (++ faintText compat "i ignore\nm more suggestions\nx exit/abort")
+                      . concatMap (\(i, (s, c)) -> faintText compat (show i ++ ". ")
+                                                ++ s
+                                                ++ faintText compat (" (" ++ show c ++ ")\n"))
                       . zip [0..]
 
 -- | Undo 'segmentText' and restore a 'Sentence' list into plain text.
@@ -104,19 +108,40 @@ data CLIFlags = CLIFlags { wordlist :: FilePath
                          } deriving Show
 
 main :: IO ()
-main = runApp ( mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
+main = runApp app{getAppVersion = Just " 0.1 alpha"} runWithFlags
+    where app = mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
                                           `andBy` reqPos "text" `Descr` "Input file name"
                                           `andBy` boolFlag "compat" `Descr` "Compatibility rendering mode (invert and underline instead of faint text)"
                              )
                              "Haspell"
                 `setAppDescr` "(Haskell spell correction based on minimum edit distance calculation)"
-                `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014")
-              runWithFlags
-          
+                `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014"
+
 runWithFlags :: CLIFlags -> IO ()
 runWithFlags myFlags = do print myFlags
-                          ts <- fromWLFile "/home/sjm/downloads/aspell-dump-expand-en.utf8.txt"
-                          --putStrLn $ (show . length $ toList ts) ++ " words loaded." -- Cheap deepseq. Also nice to know.
-                          result <- correctText ts "fajfaoirfjaerihgeairjfoerig- ... das ist (natürlich) ein Test, welcher Dinge? (Naja...) tun will...! hachja" (compatRender myFlags)
-                          --result <- correctText "Ein extrem langer Satz enthält (wenig überraschend) sehr sehr viele Worte, weitaus mehr, als vielleicht sinnvoll wäre, gerade wenn man ein bisschen auf so durchaus relevante Dinge wie Lesbarkeit achten möchte - ob das sinnvoll ist, sei natürlich dahingestellt, ein Text kann ja auch durch seine erdrückende Größe Eindruck schinden, lesen wird doch ohnehin überbewertet." ts
+                          -- openFile already does nice error handling.
+                          ts        <- fromWLFile $ wordlist myFlags
+                          userinput <-   readFile $ userFile myFlags
+                          -- Cheap deepseq. Also nice to know.
+                          putStrLn $ (show . length $ toList ts) ++ " words loaded." -- Cheap deepseq. Also nice to know.
+                          --result <- correctText ts "fajfaoirfjaerihgeairjfoerig- ... das ist (natürlich) ein Test, welcher Dinge? (Naja...) tun will...! hachja" (compatRender myFlags)
+                          result <- correctText ts "Ein extrem langer Satz enthält (wenig überraschend) sehr sehr viele Worte, weitaus mehr, als vielleicht sinnvoll wäre, gerade wenn man ein biss'chen auf so durchaus relevante Dinge wie Lesbarkeit achten möchte - ob das sinnvoll ist, sei natürlich dahingestellt, ein Text kann ja auch durch seine \"erdrueckende\" Größe Eindruck schinden, lesen wird doch ohnehin 'ueberbewertet'." (compatRender myFlags)
                           putStrLn $ "RESULT: " ++ result
+
+
+{-
+
+TODOs
+-----
+
+Konfusionsmatrizen!
+
+Wenn ihr euer Programm möglichst flexibel gestalten wollt, ist es vielleicht 
+sinnvoll, nur Zeichen, die im Wörterbuch vorkommen, als Zeichen innerhalb von 
+Worten zu akzeptieren und alle anderen Zeichen als Worttrenner zu betrachten.
+
+Besserer Einfügealgorithmus, Stackkram und so.
+
+Vorschläge, die gleich anfangen (oder case sensitive kram) bevorzugen
+
+-}
