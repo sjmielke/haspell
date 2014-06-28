@@ -1,11 +1,11 @@
-module Haspell where
+module Main where
 
 import Data.Default (def)
 import Data.Char (isLetter)
 import Data.List.Split (split, whenElt, dropBlanks, keepDelimsR, onSublist)
 import Text.Read (readMaybe)
 import System.Exit (exitSuccess)
-import System.Console.ArgParser (ParserSpec, Descr(..), parsedBy, andBy, reqPos, boolFlag, setAppEpilog, setAppDescr, mkDefaultApp, runApp, getAppVersion)
+import System.Console.ArgParser (ParserSpec, Descr(..), parsedBy, andBy, reqPos, boolFlag, optFlag, setAppEpilog, setAppDescr, mkDefaultApp, runApp, getAppVersion)
 
 import WTrie
 import TrieMED
@@ -105,36 +105,38 @@ reconstructSentences = foldr (\s acc -> concatMap reconstructSentencePart s ++ a
 data CLIFlags = CLIFlags { wordlist :: FilePath
                          , userFile :: FilePath
                          , compatRender :: Bool
+                         , outFile :: FilePath
                          } deriving Show
 
 main :: IO ()
-main = runApp app{getAppVersion = Just " 0.1 alpha"} runWithFlags
+main = runApp app{getAppVersion = Just " 1.0 alpha"} runWithFlags
     where app = mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
                                           `andBy` reqPos "text" `Descr` "Input file name"
                                           `andBy` boolFlag "compat" `Descr` "Compatibility rendering mode"
+                                          `andBy` optFlag "" "outfile" `Descr` "Output file name"
                              )
                              "Haspell"
                 `setAppDescr` "(Haskell spell correction based on minimum edit distance calculation)"
                 `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014"
 
 runWithFlags :: CLIFlags -> IO ()
-runWithFlags myFlags = do print myFlags
-                          -- openFile already does nice error handling.
+runWithFlags myFlags = do -- openFile already does nice error handling.
                           ts        <- fromWLFile $ wordlist myFlags
                           userinput <-   readFile $ userFile myFlags
                           -- Cheap deepseq. Also nice to know.
-                          putStrLn $ (show . length $ toList ts) ++ " words loaded." -- Cheap deepseq. Also nice to know.
-                          --result <- correctText ts "fajfaoirfjaerihgeairjfoerig- ... das ist (natürlich) ein Test, welcher Dinge? (Naja...) tun will...! hachja" (compatRender myFlags)
-                          result <- correctText ts "Ein extrem langer Satz enthält (wenig überraschend) sehr sehr viele Worte, weitaus mehr, als vielleicht sinnvoll wäre, gerade wenn man ein biss'chen auf so durchaus relevante Dinge wie Lesbarkeit achten möchte - ob das sinnvoll ist, sei natürlich dahingestellt, ein Text kann ja auch durch seine \"erdrueckende\" Größe Eindruck schinden, lesen wird doch ohnehin 'ueberbewertet'." (compatRender myFlags)
-                          putStrLn $ "RESULT: " ++ result
+                          putStrLn $ (show . length $ toList ts) ++ " words loaded."
+                          -- Run interactive correction session.
+                          result <- correctText ts userinput (compatRender myFlags)
+                          -- Write corrected text to filename.corrected or user-specified location.
+                          case outFile myFlags of
+                              ""       -> writeFile (userFile myFlags ++ ".corrected") result
+                              filename -> writeFile filename result
 
 
 {-
 
-TODOs
+Potenzielle TODOs
 -----
-
-Konfusionsmatrizen!
 
 Wenn ihr euer Programm möglichst flexibel gestalten wollt, ist es vielleicht 
 sinnvoll, nur Zeichen, die im Wörterbuch vorkommen, als Zeichen innerhalb von 
