@@ -12,6 +12,7 @@ import Data.Ord (comparing)
 import Data.Maybe (maybeToList)
 
 import WTrie
+import Confusion
 
 -- | A MEDTable stores the user user input String
 -- and the current column of the MED matrix.
@@ -31,10 +32,10 @@ calcMEDs :: Int -- ^ the number of suggestions to return
 calcMEDs numberOfSuggestions uword ts = map (\(s,i) -> (reverse s, i))
                                       $ take numberOfSuggestions . sortBy (comparing snd)
 --                                      $ (\l -> [(uword ++ " compared against #nodes", length l)])
---                                      $ reduceTriesAll (initialState uword) ts
+                                      $ reduceTriesAll (initialState uword) ts
                                       -- Usually we want 10 results better than 8, if more are requested,
                                       -- the betterThan-value will grow to encompass all results.
-                                      $ reduceTriesBetterThan (numberOfSuggestions - 2) (initialState uword) ts
+--                                      $ reduceTriesBetterThan (numberOfSuggestions - 2) (initialState uword) ts
 --                                      $ reduceTriesKeepTrack (initialState uword, []) ts
     where
         initialState :: String -> MEDTableState
@@ -63,38 +64,27 @@ reduceTriesBetterThan b ini ts = filter ((< b) . snd) $ reduceList ini ts
                                               in case res of Nothing ->     followers
                                                              Just r  -> r : followers
 
-reduceTriesKeepTrack :: (MEDTableState, [Result]) -> WTrie -> [Result]
-reduceTriesKeepTrack _ [] = []
-reduceTriesKeepTrack (oldState, resultsSoFar) (t:ts) = let newResList = reduceIndiv t
-                                                       in newResList ++ reduceTriesKeepTrack (oldState, newResList) ts
-    where
-        reduceIndiv :: WIndivTrie -> [Result]
-        reduceIndiv (WNode l f cs) = let (newState@(currentTable, currentWord), res, currentMED) = calcNode oldState l f
-                                         -- The best MED that is still possible in future steps is MED - max(0, wordLengthDifference)
-                                         bestMEDStillPossible = currentMED - max 0 ((length currentTable - 1) - (length currentWord))
-                                         newResultList = case res of Nothing -> resultsSoFar
-                                                                     Just r  -> updateResList r resultsSoFar
-                                         followers = if length newResultList < 10
-                                                     || bestMEDStillPossible <= (last $ take 10 $ sort $ (map snd newResultList)) -- last won't fail. Short-circuit logic, bitches.
-                                                     then reduceTriesKeepTrack (newState, newResultList) cs
-                                                     else []
-                                     in case res of Nothing ->     followers
-                                                    Just r  -> r : followers
-        updateResList r [] = [r]
-        updateResList r l@(x:xs) = if snd r <= snd x then r : l else x : updateResList r xs
-
-
 calcNode :: MEDTableState -> Char -> Bool -> (MEDTableState, Maybe Result, Int)
 calcNode (oldTable, currentWord) l f = ((newTable, l:currentWord), newRes, newMED)
     where
         -- previous column and the value below the current one
         step :: MEDTable -> Int -> MEDTable
         step (_:[]) _ = []
-        -- ci/vi: insertion/left, cs/vs: substitution/lower left, cd/vd: deletion/down
+        -- ci/vi: insertion/left/del[], cs/vs: substitution/lower left/sub[], cd==l/vd: deletion/down/add[]
         step ((cs,vs) : i@(ci,vi) : xs) vd = let newVal = if ci == l
                                                           then vs
-                                                          else 1 + min vs (min vd vi) -- everything costs 1
+                                                          else min (vs + subCost)
+                                                                   (min (vd + addCost)
+                                                                        (vi + delCost))
                                              in  (ci, newVal) : step (i : xs) newVal
+            where
+                subCost = if cs == l
+                          && not (null currentWord)
+                          && head currentWord == ci
+                          then getRevConfMat ci cs
+                          else getSubConfMat ci l
+                delCost = getDelConfMat ci l
+                addCost = getAddConfMat l ci
         -- step doesn't create a new #-row, so we manually add it here
         newHash = (1+) . snd . head $ oldTable
         newTable = (' ', newHash) : step oldTable newHash

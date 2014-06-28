@@ -1,4 +1,4 @@
-module Main where
+module Haspell where
 
 import Data.Default (def)
 import Data.Char (isLetter)
@@ -111,7 +111,7 @@ main :: IO ()
 main = runApp app{getAppVersion = Just " 0.1 alpha"} runWithFlags
     where app = mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
                                           `andBy` reqPos "text" `Descr` "Input file name"
-                                          `andBy` boolFlag "compat" `Descr` "Compatibility rendering mode (invert and underline instead of faint text)"
+                                          `andBy` boolFlag "compat" `Descr` "Compatibility rendering mode"
                              )
                              "Haspell"
                 `setAppDescr` "(Haskell spell correction based on minimum edit distance calculation)"
