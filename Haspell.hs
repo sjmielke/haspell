@@ -75,7 +75,7 @@ correctSentence ts compat s = mapM (correctSentencePart 10) sWithIds
                then return $ Word w
                else do
                     let results = calcMEDs numberOfSuggestions w ts
-                        errorCase = do putStrLn $ invertText compat "What the fuck is wrong with you? Try again."
+                        errorCase = do putStrLn $ invertText compat "Incorrect choice, please try again."
                                        correctSentencePart numberOfSuggestions (i, Word w)
                     putStrLn $ highlightInSentence i sWithIds
                     putStrLn $ renderAsTable results
@@ -122,7 +122,7 @@ data CLIFlags = CLIFlags { wordlist :: FilePath
 
 -- | Runs the CLI built using the @argparser@ package.
 main :: IO ()
-main = runApp app{getAppVersion = Just " 1.0 alpha"} runWithFlags
+main = runApp app{getAppVersion = Just " 1.0 beta"} runWithFlags
     where
         app = mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
                                      `andBy` reqPos "text" `Descr` "Input file name"
@@ -132,29 +132,15 @@ main = runApp app{getAppVersion = Just " 1.0 alpha"} runWithFlags
                            "Haspell"
               `setAppDescr` "(Haskell spell correction based on minimum edit distance calculation)"
               `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014"
-        runWithFlags myFlags = do -- openFile already does nice error handling.
+        runWithFlags myFlags = do putStrLn "Now loading word list..."
+                                  -- openFile already does nice error handling.
                                   ts        <- fromWLFile $ wordlist myFlags
                                   userinput <-   readFile $ userFile myFlags
                                   -- Cheap deepseq. Also nice to know.
-                                  putStrLn $ (show . length $ toList ts) ++ " words loaded."
+                                  putStrLn $ (show . length $ toList ts) ++ " words were loaded."
                                   -- Run interactive correction session.
                                   result <- correctText ts userinput (compatRender myFlags)
                                   -- Write corrected text to filename.corrected or user-specified location.
                                   case outFile myFlags of
                                       ""       -> writeFile (userFile myFlags ++ ".corrected") result
                                       filename -> writeFile filename result
-
-{-
-
-Potenzielle TODOs
------
-
-Wenn ihr euer Programm möglichst flexibel gestalten wollt, ist es vielleicht 
-sinnvoll, nur Zeichen, die im Wörterbuch vorkommen, als Zeichen innerhalb von 
-Worten zu akzeptieren und alle anderen Zeichen als Worttrenner zu betrachten.
-
-Besserer Einfügealgorithmus, Stackkram und so.
-
-Vorschläge, die gleich anfangen (oder case sensitive kram) bevorzugen
-
--}
