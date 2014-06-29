@@ -8,21 +8,22 @@ import System.Environment (getArgs)
 import WTrie
 import TrieMED
 
---testWL :: [String] -> IO ()
---testWL wl_dup = let wl = nub' S.empty wl_dup
-                    --wl' = toList . fromList $ wl
-                    --diff = (wl \\ wl') in -- ++ (wl' \\ wl) in
-                --putStrLn $ if null diff then "All words were accurately reproduced."
-                                        --else "ERROR in exact word reproduction, diff:" ++ show diff
-    --where
-        --nub' _ [] = []
-        --nub' s (x:xs) = if S.member x s then nub' s xs
-                                        --else x : nub' (S.insert x s) xs
+testWL :: [String] -> IO ()
+testWL wl_dup = let wl = nub wl_dup
+                    wl' = toList . fromList $ wl
+                    diff = [length wl', length wl - length wl'] --(wl \\ wl') ++ (wl' \\ wl)
+                in putStrLn $ if null diff then "All words were accurately reproduced."
+                                           else "ERROR in exact word reproduction, diff:" ++ show diff
+    where
+        nub :: (Ord a) => [a] -> [a]
+        nub = nub' S.empty
+        nub' _ [] = []
+        nub' s (x:xs) = if S.member x s then nub' s xs
+                                        else x : nub' (S.insert x s) xs
 
-
---testFile :: String -> IO ()
---testFile f = do rawwords <- readFile f
-                --testWL $ words rawwords
+testFile :: String -> IO ()
+testFile f = do rawwords <- readFile f
+                testWL $ words rawwords
 
 --testExample :: IO ()
 --testExample = do let res = calcMEDs "Lit" $ fromList ["Lot", "Lose", "Hose", "Los"]
@@ -33,12 +34,13 @@ import TrieMED
                                                            --else "ERROR in checking MEDs!"
 
 main = do ts <- fromWLFile "/home/sjm/downloads/aspell-dump-expand-de_DE.utf8.txt"
+          --testFile "/home/sjm/downloads/aspell-dump-expand-de_DE.utf8.txt"
           --toWLFile "/tmp/ha_WL" ts
-          --toWTFile "/tmp/ha_WT" ts
+          --toWTFile "/tmp/ha_WT_newseq" ts
           --ts <- fromWTFile "/tmp/ha_WT" -- This takes eternities. Deserialization is apparently evil.
           let wordnum = length $ toList ts -- Cheap deepseq. Also nice to know.
           putStrLn $ (show wordnum) ++ " words loaded."
-          let printSimpletest w = putStr $ if ts `contains` w then "" else (++"\n") . show $ calcMEDs 10 w ts
+          --let printSimpletest w = putStr $ if ts `contains` w then "" else (++"\n") . show $ calcMEDs 10 w ts
           let forceSimpletest w = putStrLn . show $ calcMEDs 10 w ts
           --mapM printSimpletest ["sfalihfaiwuehfliwauehfaiwfa", "ajfalwfaheofifmafowjfaiofja", "iwaefiehfalierjgmvcsafsefrf", "aioewjfoasmcoreijfsoerigmer", "asoiejfadorjgaormfairjfoeig", "wefaiwhefiascaimifaloifricm", "oeiafjigrofimaeorijfseorjgj", "aoiejfmosimfcijfloirajfsirg", "maoirjfoaaergaeergjfsfsafsm", "fliwaufsaedfsdfsadfehfaiwfa", "fmaforegwefawefwaefjfaiofja", "rjgmvwefasdasdfasfcsafsefrf", "reijfdefasfaefawefsoerigmer", "aormfaefrthfaefaefairjfoeig", "aimifaefaweffsawefaloifricm", "aeorijawrsthaewfgerfseorjgj", "ijfloirathsrhrsthrztqjfsirg", "maoirjfoaersfawgaageraergjm"]
           --mapM printSimpletest ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]

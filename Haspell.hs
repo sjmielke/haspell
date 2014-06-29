@@ -1,6 +1,13 @@
-module Main where
+-- | Haspell lets the user correct a text read form a file
+-- interactively by comparing words (using the minimum edit distance)
+-- to suggestions from a word list.
 
-import Data.Default (def)
+module Main (
+    correctText,
+    CLIFlags(..),
+    main
+    ) where
+
 import Data.Char (isLetter)
 import Data.List.Split (split, whenElt, dropBlanks, keepDelimsR, onSublist)
 import Text.Read (readMaybe)
@@ -27,8 +34,8 @@ underlineText compat = ansiWrap compat 4
 faintText :: Bool -> String -> String
 faintText compat = ansiWrap compat 2
 
--- | A part of a sentence is either a @Word@ (i.e. something
--- we want to correct) or @Punctuation@ (something we ignore).
+-- | A part of a sentence is either a 'Word' (i.e. something
+-- we want to correct) or 'Punctuation' (something we ignore).
 data SentencePart = Word String | Punctuation String deriving (Show)
 -- | A sentence is a list of 'SentencePart's
 -- (including punctuation and space at the end).
@@ -40,7 +47,7 @@ correctText ts txt compat = do newSentences <- mapM (correctSentence ts compat) 
                                return $ reconstructSentences newSentences
 
 -- | Primitive segmentation of a given user input into 'Sentence's
--- containing 'SentencePart's ('Word's and 'Punctionation')
+-- containing 'SentencePart's ('Word's and 'Punctuation')
 segmentText :: String -> [Sentence]
 segmentText = map segmentSentence . splitOnSubSeqs [". ", "! ", "? "] . (:[])
     where
@@ -113,6 +120,7 @@ data CLIFlags = CLIFlags { wordlist :: FilePath
                          , outFile :: FilePath
                          } deriving Show
 
+-- | Runs the CLI built using the @argparser@ package.
 main :: IO ()
 main = runApp app{getAppVersion = Just " 1.0 alpha"} runWithFlags
     where

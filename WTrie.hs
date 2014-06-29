@@ -6,6 +6,7 @@ module WTrie (
     WTrie,
     
     -- * Generation from and into different representations
+    fromList',
     fromList,
     toList,
     fromWLFile,
@@ -18,7 +19,7 @@ module WTrie (
     
     ) where
 
-import Data.List (intersperse)
+import Data.List (intersperse, groupBy, sort)
 
 -- | This Trie implementation uses one 'WNode' per 'Char'.
 -- Such a node can have many following characters and be the end of a word or not.
@@ -69,18 +70,40 @@ fromWLFile f = do rawwords <- readFile f
 toWLFile :: FilePath -> WTrie -> IO ()
 toWLFile f ts = writeFile f $ concat . intersperse "\n" $ toList ts
 
--- | Loads a Serialization of a 'WTrie' that was created using the show Instance.
+-- | Loads a serialization of a 'WTrie' using the read instance.
 fromWTFile :: FilePath -> IO WTrie
 fromWTFile f = do rawtrie <- readFile f
                   return $ read rawtrie
 
--- | Write a 'WTrie' into a file using the show-Serialization.
+-- | Write a 'WTrie' into a file using the show-serialization.
 toWTFile :: FilePath -> WTrie -> IO ()
 toWTFile f ts = writeFile f (show ts)
 
--- | Creates a 'WTrie' from a word list.
+-- | Naive approach to create a 'WTrie' from a word list (inserting word by word).
+-- Requires megabytes of stack space, but is slightly faster
+-- and consumes a little less memory than 'fromList'.
+--
+-- This version is /NOT/ used in the other methods.
+fromList' :: [String] -> WTrie
+fromList' = foldr addToTrie []
+
+-- | Idea of creating a more clever 'WTrie' construction from a word list.
+-- While it is slightly more expensive in memory and time, it doesn't require
+-- megabytes of stack space (in contrast to the naive 'fromList''
+-- If one could assume word lists to be sorted, it would be faster,
+-- but at least the @Data.List.sort@ call brings it down to the level
+-- of the primitive 'fromList''.
+--
+-- This is the version used in the other methods. 
 fromList :: [String] -> WTrie
-fromList = foldr addToTrie []
+fromList wl = go $ sort wl
+    where go ws = map (nodeFromWordlistTuple . tupleFromWordGroup) wordGroups
+            where
+                wordGroups = groupBy (\x y -> head x == head y) ws
+                tupleFromWordGroup wordGroup = (head $ head wordGroup, map tail wordGroup)
+                nodeFromWordlistTuple (c, nws) = let cs  = fromList $ filter (not . null) nws
+                                                     fin = any null nws
+                                                 in c `seq` WNode c fin cs
 
 -- | Recreates a list of all words contained in a 'WTrie'.
 toList :: WTrie -> [String]

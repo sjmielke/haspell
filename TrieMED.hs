@@ -24,10 +24,10 @@ type MEDTableState = (MEDTable, String)
 
 -- | Traverses the given 'WTrie' succesively building the MED matrices for
 -- each word to the given input word, returning a list of the best matches.
-calcMEDs :: Int -- ^ the number of suggestions to return
-         -> String
-         -> WTrie
-         -> [Result]
+calcMEDs :: Int      -- ^ the number of suggestions to return
+         -> String   -- ^ the user word to compare against
+         -> WTrie    -- ^ the 'WTrie' containing the word list
+         -> [Result] -- ^ the (unsorted) list of corrections
 calcMEDs numberOfSuggestions uword ts = map (\(s,i) -> (reverse s, i))
                                       $ take numberOfSuggestions . sortBy (comparing snd)
 --                                      $ (\l -> [(uword ++ " compared against #nodes", length l)])
