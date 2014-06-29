@@ -27,7 +27,11 @@ underlineText compat = ansiWrap compat 4
 faintText :: Bool -> String -> String
 faintText compat = ansiWrap compat 2
 
+-- | A part of a sentence is either a @Word@ (i.e. something
+-- we want to correct) or @Punctuation@ (something we ignore).
 data SentencePart = Word String | Punctuation String deriving (Show)
+-- | A sentence is a list of 'SentencePart's
+-- (including punctuation and space at the end).
 type Sentence = [SentencePart]
 
 -- | Callable entry point for interactive text correction.
@@ -102,6 +106,7 @@ reconstructSentences = foldr (\s acc -> concatMap reconstructSentencePart s ++ a
     where reconstructSentencePart p = case p of Word s -> s
                                                 Punctuation s -> s
 
+-- | The user can specify various flags over the CLI.
 data CLIFlags = CLIFlags { wordlist :: FilePath
                          , userFile :: FilePath
                          , compatRender :: Bool
@@ -110,28 +115,26 @@ data CLIFlags = CLIFlags { wordlist :: FilePath
 
 main :: IO ()
 main = runApp app{getAppVersion = Just " 1.0 alpha"} runWithFlags
-    where app = mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
-                                          `andBy` reqPos "text" `Descr` "Input file name"
-                                          `andBy` boolFlag "compat" `Descr` "Compatibility rendering mode"
-                                          `andBy` optFlag "" "outfile" `Descr` "Output file name"
-                             )
-                             "Haspell"
-                `setAppDescr` "(Haskell spell correction based on minimum edit distance calculation)"
-                `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014"
-
-runWithFlags :: CLIFlags -> IO ()
-runWithFlags myFlags = do -- openFile already does nice error handling.
-                          ts        <- fromWLFile $ wordlist myFlags
-                          userinput <-   readFile $ userFile myFlags
-                          -- Cheap deepseq. Also nice to know.
-                          putStrLn $ (show . length $ toList ts) ++ " words loaded."
-                          -- Run interactive correction session.
-                          result <- correctText ts userinput (compatRender myFlags)
-                          -- Write corrected text to filename.corrected or user-specified location.
-                          case outFile myFlags of
-                              ""       -> writeFile (userFile myFlags ++ ".corrected") result
-                              filename -> writeFile filename result
-
+    where
+        app = mkDefaultApp (CLIFlags `parsedBy` reqPos "wordlist" `Descr` "Word list file name"
+                                     `andBy` reqPos "text" `Descr` "Input file name"
+                                     `andBy` boolFlag "compat" `Descr` "Compatibility rendering mode"
+                                     `andBy` optFlag "" "outfile" `Descr` "Output file name"
+                           )
+                           "Haspell"
+              `setAppDescr` "(Haskell spell correction based on minimum edit distance calculation)"
+              `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014"
+        runWithFlags myFlags = do -- openFile already does nice error handling.
+                                  ts        <- fromWLFile $ wordlist myFlags
+                                  userinput <-   readFile $ userFile myFlags
+                                  -- Cheap deepseq. Also nice to know.
+                                  putStrLn $ (show . length $ toList ts) ++ " words loaded."
+                                  -- Run interactive correction session.
+                                  result <- correctText ts userinput (compatRender myFlags)
+                                  -- Write corrected text to filename.corrected or user-specified location.
+                                  case outFile myFlags of
+                                      ""       -> writeFile (userFile myFlags ++ ".corrected") result
+                                      filename -> writeFile filename result
 
 {-
 
