@@ -49,7 +49,7 @@ correctText ts txt compat = do newSentences <- mapM (correctSentence ts compat) 
 -- | Primitive segmentation of a given user input into 'Sentence's
 -- containing 'SentencePart's ('Word's and 'Punctuation')
 segmentText :: String -> [Sentence]
-segmentText = map segmentSentence . splitOnSubSeqs [". ", "! ", "? "] . (:[])
+segmentText = map segmentSentence . splitOnSubSeqs [". ", "! ", "? ", ".\t", "!\t", "?\t", ".\n", "!\n", "?\n"] . (:[])
     where
         splitOnSubSeqs :: [String] -> [String] -> [String]
         splitOnSubSeqs [] text = text
@@ -134,13 +134,21 @@ main = runApp app{getAppVersion = Just " 1.0 beta"} runWithFlags
               `setAppEpilog` "Developed for a university course by Sebastian J. Mielke 2014"
         runWithFlags myFlags = do putStrLn "Now loading word list..."
                                   -- openFile already does nice error handling.
-                                  ts        <- fromWLFile $ wordlist myFlags
-                                  userinput <-   readFile $ userFile myFlags
+                                  ts <- fromWLFile $ wordlist myFlags
                                   -- Cheap deepseq. Also nice to know.
                                   putStrLn $ (show . length $ toList ts) ++ " words were loaded."
+                                  
+                                  putStrLn "Now loading input text..."
+                                  -- openFile already does nice error handling.
+                                  userinput <- readFile $ userFile myFlags
+                                  
                                   -- Run interactive correction session.
                                   result <- correctText ts userinput (compatRender myFlags)
+                                  
                                   -- Write corrected text to filename.corrected or user-specified location.
-                                  case outFile myFlags of
-                                      ""       -> writeFile (userFile myFlags ++ ".corrected") result
-                                      filename -> writeFile filename result
+                                  let outFilePath = case outFile myFlags of
+                                                      ""       -> (userFile myFlags ++ ".corrected")
+                                                      filename -> filename
+                                  putStrLn $ "Saving corrected text to \"" ++ outFilePath ++ "\"..."
+                                  writeFile outFilePath result
+                                  putStrLn "All done. So long, and thanks for all the fish!"
